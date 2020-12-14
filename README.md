@@ -98,7 +98,7 @@ private:
 You can also inject using `InjectTraits`.
 This is executed after the constructor.
 
-But. **Field Inject** also uses `InjectTraits`, so be careful of conflicts!!
+__But. *Field Inject* also uses `InjectTraits`, so be careful of conflicts!!__
 
 ```cpp
 namespace emaject
@@ -159,4 +159,9 @@ private:
     [[INJECT(m_printer1, 1)]] // ID = 1
     std::shared_ptr<IPrinter> m_printer1;
 };
+```
+or resolve
+
+```cpp
+container->resolve<Type, ID>();
 ```

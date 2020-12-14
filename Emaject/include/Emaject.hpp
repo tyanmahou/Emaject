@@ -55,7 +55,7 @@ namespace emaject
             {
                 auto operator()(Container* c)
                 {
-                    return  std::make_shared<T>(c->resolve<typename std::decay_t<Args>::element_type>()...);
+                    return  std::make_shared<Type>(c->resolve<typename std::decay_t<Args>::element_type>()...);
                 }
             };
 

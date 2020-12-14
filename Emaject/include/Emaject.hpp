@@ -118,13 +118,17 @@ namespace emaject
             {}
 
             template<class U>
-            [[nodiscard]] auto to()
+            [[nodiscard]] auto to() const
             {
                 return fromInstance([c = m_container]() {
                     return c->build<U>();
                 });
             }
-            [[nodiscard]] auto fromInstance(const CreateFunc<Type>& func)
+            [[nodiscard]] auto toSelf() const
+            {
+                return to<Type>();
+            }
+            [[nodiscard]] auto fromInstance(const CreateFunc<Type>& func) const
             {
                 return BindRegister<Type, ID>(m_container, func);
             }
@@ -178,19 +182,22 @@ namespace emaject
     class Injector
     {
     private:
-        Container m_container;
+        std::shared_ptr<Container> m_container;
     public:
+        Injector():
+            m_container(std::make_shared<Container>())
+        {}
 
         template<class Installer, class...Args>
-        Injector& install(Args&&... args)
+        Injector& install(Args&&... args) requires std::is_base_of_v<IInstaller, Installer>
         {
-            Installer(std::forward<Args>(args)...).onBinding(&m_container);
+            Installer(std::forward<Args>(args)...).onBinding(m_container.get());
             return *this;
         }
         template<class Type, int ID = 0>
         [[nodiscard]] std::shared_ptr<Type> resolve()
         {
-            return m_container.resolve<Type, ID>();
+            return m_container->resolve<Type, ID>();
         }
     };
 

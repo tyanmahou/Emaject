@@ -98,7 +98,7 @@ private:
 You can also inject using `InjectTraits`.
 This is executed after the constructor.
 
-⚠️__But. *Field Inject* also uses `InjectTraits`, so be careful of conflicts!!__
+⚠️ __But. *Field Inject* also uses `InjectTraits`, so be careful of conflicts!!__
 
 ```cpp
 namespace emaject

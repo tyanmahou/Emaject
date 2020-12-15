@@ -32,6 +32,7 @@ namespace emaject
         {
             Transient,
             Cache,
+            Single
         };
         template<class Type, int ID>
         struct Tag {};
@@ -106,6 +107,11 @@ namespace emaject
                 return m_container
                     ->bindRegist<Type, ID>(BindInfo<Type>{m_func, CreateKind::Cache});
             }
+            bool asSingle() const requires (ID == 0)
+            {
+                return m_container
+                    ->bindRegist<Type, ID>(BindInfo<Type>{m_func, CreateKind::Single});
+            }
         };
         template<class Type, int ID>
         class Bainder
@@ -132,16 +138,39 @@ namespace emaject
             {
                 return BindRegister<Type, ID>(m_container, func);
             }
+
+            bool asTransient() const
+            {
+                return toSelf().asTransient();
+            }
+            bool asCache() const
+            {
+                return toSelf().asCache();
+            }
+            bool asSingle() const
+            {
+                return toSelf().asSingle();
+            }
         };
         template<class Type, int ID>
         bool bindRegist(const BindInfo<Type>& info)
         {
-            const auto& id = typeid(Tag<Type, ID>);
+            const auto& id = info.kind == CreateKind::Single ? typeid(Type) :typeid(Tag<Type, ID>);
             if (m_createFuncs.find(id) != m_createFuncs.end()) {
                 return false;
             }
             m_createFuncs[id] = info;
             return true;
+        }
+
+        template<class Type, int ID = 0>
+        const std::type_info& resolveId() const
+        {
+            const auto& singleId = typeid(Type);
+            if (m_createFuncs.find(singleId) != m_createFuncs.end()) {
+                return singleId;
+            }
+            return typeid(Tag<Type, ID>);
         }
     public:
         template<class Type, int ID = 0>
@@ -153,7 +182,7 @@ namespace emaject
         template<class Type, int ID = 0>
         [[nodiscard]] std::shared_ptr<Type> resolve()
         {
-            const auto& id = typeid(Tag<Type, ID>);
+            const auto& id = resolveId<Type, ID>();
             if (m_instanceCache.find(id) != m_instanceCache.end()) {
                 return std::any_cast<std::shared_ptr<Type>>(m_instanceCache[id]);
             }
@@ -162,7 +191,7 @@ namespace emaject
             }
             auto [func, createKind] = std::any_cast<BindInfo<Type>>(m_createFuncs.at(id));
             auto ret = func();
-            if (createKind == CreateKind::Cache) {
+            if (createKind != CreateKind::Transient) {
                 m_instanceCache[id] = ret;
             }
             return ret;

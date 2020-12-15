@@ -28,7 +28,7 @@ namespace emaject
     };
     class Container
     {
-        enum class CreateKind
+        enum class ScopeKind
         {
             Transient,
             Cache,
@@ -44,7 +44,7 @@ namespace emaject
         struct BindInfo
         {
             CreateFunc<Type> func;
-            CreateKind kind;
+            ScopeKind kind;
         };
         template<class Type>
         struct Builder
@@ -100,17 +100,17 @@ namespace emaject
             bool asTransient() const
             {
                 return m_container
-                    ->bindRegist<Type, ID>(BindInfo<Type>{m_func, CreateKind::Transient});
+                    ->bindRegist<Type, ID>(BindInfo<Type>{m_func, ScopeKind::Transient});
             }
             bool asCache() const
             {
                 return m_container
-                    ->bindRegist<Type, ID>(BindInfo<Type>{m_func, CreateKind::Cache});
+                    ->bindRegist<Type, ID>(BindInfo<Type>{m_func, ScopeKind::Cache});
             }
             bool asSingle() const requires (ID == 0)
             {
                 return m_container
-                    ->bindRegist<Type, ID>(BindInfo<Type>{m_func, CreateKind::Single});
+                    ->bindRegist<Type, ID>(BindInfo<Type>{m_func, ScopeKind::Single});
             }
         };
         template<class Type, int ID>
@@ -155,7 +155,7 @@ namespace emaject
         template<class Type, int ID>
         bool bindRegist(const BindInfo<Type>& info)
         {
-            const auto& id = info.kind == CreateKind::Single ? typeid(Type) :typeid(Tag<Type, ID>);
+            const auto& id = info.kind == ScopeKind::Single ? typeid(Type) :typeid(Tag<Type, ID>);
             if (m_createFuncs.find(id) != m_createFuncs.end()) {
                 return false;
             }
@@ -191,7 +191,7 @@ namespace emaject
             }
             auto [func, createKind] = std::any_cast<BindInfo<Type>>(m_createFuncs.at(id));
             auto ret = func();
-            if (createKind != CreateKind::Transient) {
+            if (createKind != ScopeKind::Transient) {
                 m_instanceCache[id] = ret;
             }
             return ret;

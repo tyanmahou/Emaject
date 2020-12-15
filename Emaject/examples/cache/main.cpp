@@ -39,11 +39,11 @@ int main()
     injector.install<CounterInstaller>();
 
     {
-        auto counter = injector.resolve<ICounter>();
+        auto counter = injector.resolve<ICounter>();  // new instance
         std::cout << counter->countUp() << std::endl; // 1
     }
     {
-        auto counter = injector.resolve<ICounter>();
+        auto counter = injector.resolve<ICounter>();  // used cache
         std::cout << counter->countUp() << std::endl; // 2 
     }
 }

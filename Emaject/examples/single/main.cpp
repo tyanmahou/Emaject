@@ -30,6 +30,11 @@ struct CounterInstaller : IInstaller
         c->bind<ICounter>()
             .to<Counter>()
             .asSingle();
+
+        // compile error "don't use ID"
+        //c->bind<ICounter, 1>()
+        //    .to<Counter>()
+        //    .asSingle();
     }
 };
 
@@ -39,11 +44,11 @@ int main()
     injector.install<CounterInstaller>();
 
     {
-        auto counter = injector.resolve<ICounter, 0>();
-        std::cout << counter->countUp() << std::endl; // 1
+        auto counter = injector.resolve<ICounter, 0>(); // new instance
+        std::cout << counter->countUp() << std::endl;   // 1
     }
     {
-        auto counter = injector.resolve<ICounter, 1>();
-        std::cout << counter->countUp() << std::endl; // 1 
+        auto counter = injector.resolve<ICounter, 1>(); // used cache
+        std::cout << counter->countUp() << std::endl;   // 2 
     }
 }

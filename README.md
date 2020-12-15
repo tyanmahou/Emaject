@@ -98,7 +98,7 @@ private:
 You can also inject using `InjectTraits`.
 This is executed after the constructor.
 
-__But. *Field Inject* also uses `InjectTraits`, so be careful of conflicts!!__
+⚠️__But. *Field Inject* also uses `InjectTraits`, so be careful of conflicts!!__
 
 ```cpp
 namespace emaject
@@ -164,4 +164,105 @@ or resolve
 
 ```cpp
 container->resolve<Type, ID>();
+```
+
+### Scope
+
+#### Transient
+
+If you use `asTransient()`, an instance will be created for each injection.
+
+```cpp
+struct CounterInstaller : IInstaller
+{
+    void onBinding(Container* c) const
+    {
+        c->bind<ICounter>()
+            .to<Counter>()
+            .asTransient();
+    }
+};
+
+int main()
+{
+    Injector injector;
+    injector.install<CounterInstaller>();
+
+    {
+        auto counter = injector.resolve<ICounter>();  // new instance
+        std::cout << counter->countUp() << std::endl; // 1
+    }
+    {
+        auto counter = injector.resolve<ICounter>();  // new instance
+        std::cout << counter->countUp() << std::endl; // 1 
+    }
+}
+```
+
+#### Cache
+
+If you use `asCache`, the one cached by the ID will be reused.
+
+```cpp
+struct CounterInstaller : IInstaller
+{
+    void onBinding(Container* c) const
+    {
+        container->bind<ICounter>()
+            .to<Counter>()
+            .asCache();
+    }
+};
+
+int main()
+{
+    Injector injector;
+    injector.install<CounterInstaller>();
+
+    {
+        auto counter = injector.resolve<ICounter>();  // new instance
+        std::cout << counter->countUp() << std::endl; // 1
+    }
+    {
+        auto counter = injector.resolve<ICounter>();  // use cache 
+        std::cout << counter->countUp() << std::endl; // 2 
+    }
+}
+```
+
+#### Single
+
+If you use `asSingle`, the cached one will be reused regardless of the ID.
+ID cannot be used in binding that used this.
+
+```cpp
+struct CounterInstaller : IInstaller
+{
+    void onBinding(Container* c) const
+    {
+        c->bind<ICounter>()
+            .to<Counter>()
+            .asSingle();
+
+        // compile error "don't use ID"
+        //c->bind<ICounter, 1>()
+        //    .to<Counter>()
+        //    .asSingle();
+    }
+};
+
+int main()
+{
+    Injector injector;
+    injector.install<CounterInstaller>();
+
+    {
+        auto counter = injector.resolve<ICounter, 0>(); // new instance
+        std::cout << counter->countUp() << std::endl;   // 1
+    }
+    {
+        auto counter = injector.resolve<ICounter, 1>(); // used cache
+        std::cout << counter->countUp() << std::endl;   // 2 
+    }
+}
 ```

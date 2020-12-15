@@ -87,13 +87,13 @@ namespace emaject
             }
         }
         template<class Type, int ID>
-        class BindRegister
+        class ScopeRegister
         {
         private:
             Container* m_container;
             CreateFunc<Type> m_func;
         public:
-            BindRegister(Container* c, const CreateFunc<Type>& f) :
+            ScopeRegister(Container* c, const CreateFunc<Type>& f) :
                 m_container(c),
                 m_func(f)
             {}
@@ -114,12 +114,12 @@ namespace emaject
             }
         };
         template<class Type, int ID>
-        class Bainder
+        class Binder
         {
         private:
             Container* m_container;
         public:
-            Bainder(Container* c) :
+            Binder(Container* c) :
                 m_container(c)
             {}
 
@@ -136,7 +136,7 @@ namespace emaject
             }
             [[nodiscard]] auto fromInstance(const CreateFunc<Type>& func) const
             {
-                return BindRegister<Type, ID>(m_container, func);
+                return ScopeRegister<Type, ID>(m_container, func);
             }
 
             bool asTransient() const
@@ -176,7 +176,7 @@ namespace emaject
         template<class Type, int ID = 0>
         [[nodiscard]] auto bind()
         {
-            return Bainder<Type, ID>(this);
+            return Binder<Type, ID>(this);
         }
 
         template<class Type, int ID = 0>

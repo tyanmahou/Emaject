@@ -143,6 +143,9 @@
   <ItemGroup>
     <ClInclude Include="include\Emaject.hpp" />
   </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="examples\transient\main.cpp" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

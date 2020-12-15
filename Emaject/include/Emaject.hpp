@@ -2,7 +2,6 @@
 
 #include <memory>
 #include <functional>
-#include <any>
 #include <unordered_map>
 #include <typeindex>
 
@@ -42,13 +41,13 @@ namespace emaject
         struct Tag {};
 
         template<class Type>
-        using CreateFunc = std::function<std::shared_ptr<Type>()>;
+        using Factory = std::function<std::shared_ptr<Type>()>;
 
-        template<class Type>
         struct BindInfo
         {
-            CreateFunc<Type> func;
+            Factory<void> factory;
             ScopeKind kind;
+            std::shared_ptr<void> cache;
         };
         template<class Type>
         struct Builder
@@ -95,26 +94,26 @@ namespace emaject
         {
         private:
             Container* m_container;
-            CreateFunc<Type> m_func;
+            Factory<Type> m_factory;
         public:
-            ScopeRegister(Container* c, const CreateFunc<Type>& f) :
+            ScopeRegister(Container* c, const Factory<Type>& f) :
                 m_container(c),
-                m_func(f)
+                m_factory(f)
             {}
             bool asTransient() const
             {
                 return m_container
-                    ->bindRegist<Type, ID>(BindInfo<Type>{m_func, ScopeKind::Transient});
+                    ->bindRegist<Type, ID>(BindInfo{m_factory, ScopeKind::Transient, nullptr});
             }
             bool asCache() const
             {
                 return m_container
-                    ->bindRegist<Type, ID>(BindInfo<Type>{m_func, ScopeKind::Cache});
+                    ->bindRegist<Type, ID>(BindInfo{m_factory, ScopeKind::Cache, nullptr });
             }
             bool asSingle() const requires (ID == 0)
             {
                 return m_container
-                    ->bindRegist<Type, ID>(BindInfo<Type>{m_func, ScopeKind::Single});
+                    ->bindRegist<Type, ID>(BindInfo{m_factory, ScopeKind::Single, nullptr });
             }
         };
         template<class Type, int ID>
@@ -138,9 +137,9 @@ namespace emaject
             {
                 return to<Type>();
             }
-            [[nodiscard]] auto fromInstance(const CreateFunc<Type>& func) const
+            [[nodiscard]] auto fromInstance(const Factory<Type>& factory) const
             {
-                return ScopeRegister<Type, ID>(m_container, func);
+                return ScopeRegister<Type, ID>(m_container, factory);
             }
 
             bool asTransient() const
@@ -157,13 +156,13 @@ namespace emaject
             }
         };
         template<class Type, int ID>
-        bool bindRegist(const BindInfo<Type>& info)
+        bool bindRegist(const BindInfo& info)
         {
             const auto& id = info.kind == ScopeKind::Single ? typeid(Type) :typeid(Tag<Type, ID>);
-            if (m_createFuncs.find(id) != m_createFuncs.end()) {
+            if (m_bindInfos.find(id) != m_bindInfos.end()) {
                 return false;
             }
-            m_createFuncs[id] = info;
+            m_bindInfos[id] = info;
             return true;
         }
 
@@ -171,7 +170,7 @@ namespace emaject
         const std::type_info& resolveId() const
         {
             const auto& singleId = typeid(Type);
-            if (m_createFuncs.find(singleId) != m_createFuncs.end()) {
+            if (m_bindInfos.find(singleId) != m_bindInfos.end()) {
                 return singleId;
             }
             return typeid(Tag<Type, ID>);
@@ -187,22 +186,20 @@ namespace emaject
         [[nodiscard]] std::shared_ptr<Type> resolve()
         {
             const auto& id = resolveId<Type, ID>();
-            if (m_instanceCache.find(id) != m_instanceCache.end()) {
-                return std::any_cast<std::shared_ptr<Type>>(m_instanceCache[id]);
-            }
-            if (m_createFuncs.find(id) == m_createFuncs.end()) {
+            if (m_bindInfos.find(id) == m_bindInfos.end()) {
                 return this->build<Type>();
             }
-            auto [func, createKind] = std::any_cast<BindInfo<Type>>(m_createFuncs.at(id));
-            auto ret = func();
+            auto&& [factory, createKind, cache] = m_bindInfos.at(id);
             if (createKind != ScopeKind::Transient) {
-                m_instanceCache[id] = ret;
+                if (!cache) {
+                    cache = factory();
+                }
+                return std::static_pointer_cast<Type>(cache);
             }
-            return ret;
+            return std::static_pointer_cast<Type>(factory());
         }
     private:
-        std::unordered_map<std::type_index, std::any> m_createFuncs;
-        std::unordered_map<std::type_index, std::any> m_instanceCache;
+        std::unordered_map<std::type_index, BindInfo> m_bindInfos;
     };
 
     /// <summary>

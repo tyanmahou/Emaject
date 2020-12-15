@@ -144,7 +144,7 @@
     <ClInclude Include="include\Emaject.hpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="examples\single\main.cpp" />
+    <ClCompile Include="examples\lambda_install\main.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

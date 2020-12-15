@@ -26,6 +26,10 @@ namespace emaject
     {
         typename Type::CtorInject;
     };
+
+    /// <summary>
+    /// Container
+    /// </summary>
     class Container
     {
         enum class ScopeKind
@@ -201,13 +205,18 @@ namespace emaject
         std::unordered_map<std::type_index, std::any> m_instanceCache;
     };
 
+    /// <summary>
+    /// Installer
+    /// </summary>
     struct IInstaller
     {
         virtual ~IInstaller() = default;
         virtual void onBinding(Container* c) const = 0;
     };
 
-
+    /// <summary>
+    /// Injector
+    /// </summary>
     class Injector
     {
     private:
@@ -221,6 +230,12 @@ namespace emaject
         Injector& install(Args&&... args) requires std::is_base_of_v<IInstaller, Installer>
         {
             Installer(std::forward<Args>(args)...).onBinding(m_container.get());
+            return *this;
+        }
+
+        Injector& install(const std::function<void(Container* c)>& installer)
+        {
+            installer(m_container.get());
             return *this;
         }
         template<class Type, int ID = 0>

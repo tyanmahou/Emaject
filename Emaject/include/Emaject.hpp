@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <functional>
+#include <any>
 #include <unordered_map>
 #include <typeindex>
 
@@ -43,11 +44,12 @@ namespace emaject
         template<class Type>
         using Factory = std::function<std::shared_ptr<Type>()>;
 
+        template<class Type>
         struct BindInfo
         {
-            Factory<void> factory;
+            Factory<Type> factory;
             ScopeKind kind;
-            std::shared_ptr<void> cache;
+            std::shared_ptr<Type> cache;
         };
         template<class Type>
         struct Builder
@@ -103,17 +105,17 @@ namespace emaject
             bool asTransient() const
             {
                 return m_container
-                    ->bindRegist<Type, ID>(BindInfo{m_factory, ScopeKind::Transient, nullptr});
+                    ->bindRegist<Type, ID>(BindInfo<Type>{m_factory, ScopeKind::Transient, nullptr});
             }
             bool asCache() const
             {
                 return m_container
-                    ->bindRegist<Type, ID>(BindInfo{m_factory, ScopeKind::Cache, nullptr });
+                    ->bindRegist<Type, ID>(BindInfo<Type>{m_factory, ScopeKind::Cache, nullptr });
             }
             bool asSingle() const requires (ID == 0)
             {
                 return m_container
-                    ->bindRegist<Type, ID>(BindInfo{m_factory, ScopeKind::Single, nullptr });
+                    ->bindRegist<Type, ID>(BindInfo<Type>{m_factory, ScopeKind::Single, nullptr });
             }
         };
         template<class Type, int ID>
@@ -129,7 +131,7 @@ namespace emaject
             template<class U>
             [[nodiscard]] auto to() const
             {
-                return fromInstance([c = m_container]() {
+                return fromFactory([c = m_container]() {
                     return c->build<U>();
                 });
             }
@@ -137,11 +139,16 @@ namespace emaject
             {
                 return to<Type>();
             }
-            [[nodiscard]] auto fromInstance(const Factory<Type>& factory) const
+            [[nodiscard]] auto fromInstance(const std::shared_ptr<Type>& instance) const
+            {
+                return fromFactory([i = instance]() {
+                    return i;
+                });
+            }
+            [[nodiscard]] auto fromFactory(const Factory<Type>& factory) const
             {
                 return ScopeRegister<Type, ID>(m_container, factory);
             }
-
             bool asTransient() const
             {
                 return toSelf().asTransient();
@@ -156,7 +163,7 @@ namespace emaject
             }
         };
         template<class Type, int ID>
-        bool bindRegist(const BindInfo& info)
+        bool bindRegist(const BindInfo<Type>& info)
         {
             const auto& id = info.kind == ScopeKind::Single ? typeid(Type) :typeid(Tag<Type, ID>);
             if (m_bindInfos.find(id) != m_bindInfos.end()) {
@@ -189,7 +196,7 @@ namespace emaject
             if (m_bindInfos.find(id) == m_bindInfos.end()) {
                 return this->build<Type>();
             }
-            auto&& [factory, createKind, cache] = m_bindInfos.at(id);
+            auto&& [factory, createKind, cache] = std::any_cast<BindInfo<Type>&>(m_bindInfos.at(id));
             if (createKind != ScopeKind::Transient) {
                 if (!cache) {
                     cache = factory();
@@ -199,7 +206,7 @@ namespace emaject
             return std::static_pointer_cast<Type>(factory());
         }
     private:
-        std::unordered_map<std::type_index, BindInfo> m_bindInfos;
+        std::unordered_map<std::type_index, std::any> m_bindInfos;
     };
 
     /// <summary>

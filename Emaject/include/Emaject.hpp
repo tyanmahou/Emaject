@@ -255,51 +255,59 @@ namespace emaject
     //----------------------------------------
     namespace detail
     {
-        inline constexpr int AUTO_INJECT_MAX_LINES = 500;
+        inline constexpr size_t AUTO_INJECT_MAX_LINES = 500;
 
-        template<int Line>
+        template<size_t Line>
         struct AutoInjectLine
         {
             Container* container;
         };
 
-        template<class Type, int LineNum>
+        template<class Type, size_t LineNum>
         concept AutoInjectCallable = requires(Type t, AutoInjectLine<LineNum> l)
         {
             t | l;
         };
 
-        template <class Type, int LineNum>
-        consteval int NextAutoInjectId()
+        template <size_t... As, size_t... Bs>
+        constexpr std::index_sequence<As..., Bs...> operator+(std::index_sequence<As...>, std::index_sequence<Bs...>)
         {
-            if constexpr (LineNum == AUTO_INJECT_MAX_LINES) {
-                return AUTO_INJECT_MAX_LINES;
-            } else if constexpr (AutoInjectCallable<Type, LineNum + 1>) {
-                return LineNum + 1;
+            return {};
+        }
+        template <class Type, size_t LineNum>
+        constexpr auto filter_seq()
+        {
+            if constexpr (AutoInjectCallable<Type, LineNum>) {
+                return std::index_sequence<LineNum>{};
             } else {
-                return NextAutoInjectId<Type, LineNum + 1>();
+                return std::index_sequence<>{};
             }
         }
-        template<class Type>
-        concept IsAutoInjectable = (NextAutoInjectId<Type, 1>() != AUTO_INJECT_MAX_LINES);
-
-        template <class Type, int LineNum = NextAutoInjectId<Type, 1>()>
-        struct AutoInjecter {};
-
-        template <IsAutoInjectable Type, int LineNum>
-        struct AutoInjecter<Type, LineNum>
+        template <class Type, size_t ...Seq>
+        constexpr auto make_sequence_impl(std::index_sequence<Seq...>)
         {
-            void operator()([[maybe_unused]] Type& ret, Container* c)
-            {
-                if constexpr (AutoInjectCallable<Type, LineNum>) {
-                    ret | AutoInjectLine<LineNum>{c};
-                }
-                [[maybe_unused]] constexpr int nextId = NextAutoInjectId<Type, LineNum>();
-                if constexpr (nextId != AUTO_INJECT_MAX_LINES) {
-                    AutoInjecter<Type, nextId>{}(ret, c);
-                }
-            }
-        };
+            return (filter_seq<Type, Seq>() + ...);
+        }
+
+        template <class Type>
+        constexpr auto make_sequence()
+        {
+            return make_sequence_impl<Type>(std::make_index_sequence<AUTO_INJECT_MAX_LINES>());
+        }
+
+        template<class Type>
+        concept IsAutoInjectable = decltype(make_sequence<Type>())::size() > 0;
+
+        template<IsAutoInjectable Type, size_t LineNum>
+        void auto_inject([[maybe_unused]] Type& ret, Container* c)
+        {
+            ret | AutoInjectLine<LineNum>{c};
+        }
+        template<IsAutoInjectable Type, size_t ...Seq>
+        void auto_inject_all([[maybe_unused]] Type& ret, Container* c, std::index_sequence<Seq...>)
+        {
+            (auto_inject<Type, Seq>(ret, c), ...);
+        }
     }
 
     template<detail::IsAutoInjectable Type>
@@ -307,7 +315,7 @@ namespace emaject
     {
         void onInject(Type* value, Container* c)
         {
-            detail::AutoInjecter<Type>{}(*value, c);
+            detail::auto_inject_all(*value, c, detail::make_sequence<Type>());
         }
     };
 }

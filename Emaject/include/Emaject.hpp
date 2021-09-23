@@ -299,14 +299,19 @@ namespace emaject
         concept IsAutoInjectable = decltype(make_sequence<Type>())::size() > 0;
 
         template<IsAutoInjectable Type, size_t LineNum>
-        void auto_inject([[maybe_unused]] Type& ret, Container* c)
+        void auto_inject(Type& ret, Container* c)
         {
             ret | AutoInjectLine<LineNum>{c};
         }
         template<IsAutoInjectable Type, size_t ...Seq>
-        void auto_inject_all([[maybe_unused]] Type& ret, Container* c, std::index_sequence<Seq...>)
+        void auto_inject_all_impl([[maybe_unused]] Type& ret, Container* c, std::index_sequence<Seq...>)
         {
             (auto_inject<Type, Seq>(ret, c), ...);
+        }
+        template<IsAutoInjectable Type>
+        void auto_inject_all(Type& ret, Container* c)
+        {
+            auto_inject_all_impl(ret, c, make_sequence<Type>());
         }
     }
 
@@ -315,7 +320,7 @@ namespace emaject
     {
         void onInject(Type* value, Container* c)
         {
-            detail::auto_inject_all(*value, c, detail::make_sequence<Type>());
+            detail::auto_inject_all(*value, c);
         }
     };
 }

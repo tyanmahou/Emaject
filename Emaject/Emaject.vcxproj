@@ -156,6 +156,9 @@
     <ClCompile Include="tests\transient.cpp" />
     <ClCompile Include="tests\use_id.cpp" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include=".runsettings" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

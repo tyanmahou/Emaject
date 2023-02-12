@@ -154,7 +154,9 @@
     <ClCompile Include="tests\tests.cpp" />
     <ClCompile Include="tests\single.cpp" />
     <ClCompile Include="tests\transient.cpp" />
+    <ClCompile Include="tests\unused.cpp" />
     <ClCompile Include="tests\use_id.cpp" />
+    <ClCompile Include="tests\with_arg.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".runsettings" />

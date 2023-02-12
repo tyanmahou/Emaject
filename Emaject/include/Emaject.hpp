@@ -146,15 +146,28 @@ namespace emaject
             {}
 
             template<class U>
-            [[nodiscard]] auto to() const
+            [[nodiscard]] auto to() const requires !std::is_abstract_v<U>
             {
                 return fromFactory([c = m_container]() {
                     return c->build<U>();
                 });
             }
+            template<class U, class... Args>
+            [[nodiscard]] auto toWith(Args&&... args) const requires !std::is_abstract_v<U> && std::constructible_from<U, Args...>
+            {
+                return fromFactory([...args = std::forward<Args>(args)]{
+                    // not allow move becouse transient
+                    return std::make_shared<U>(args...);
+                });
+            }
             [[nodiscard]] auto toSelf() const requires !std::is_abstract_v<Type>
             {
                 return to<Type>();
+            }
+            template<class... Args>
+            [[nodiscard]] auto toSelfWith(Args&&... args) const requires !std::is_abstract_v<Type> && std::constructible_from<Type, Args...>
+            {
+                return toWith<Type>(std::forward<Args>(args)...);
             }
             [[nodiscard]] auto fromInstance(const std::shared_ptr<Type>& instance) const
             {
@@ -165,6 +178,12 @@ namespace emaject
             [[nodiscard]] auto fromFactory(const Factory<Type>& factory) const
             {
                 return ScopeRegister<Type, ID>(m_container, factory);
+            }
+            [[nodiscard]] auto unused() const
+            {
+                return fromFactory([]{
+                    return nullptr;
+                });
             }
             bool asTransient() const requires !std::is_abstract_v<Type>
             {

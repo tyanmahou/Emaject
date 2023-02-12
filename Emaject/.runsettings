@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <RunSettings>
 	<Catch2Adapter>
+		<WorkingDirectory>tests</WorkingDirectory>
 		<FilenameFilter>.*</FilenameFilter>
 	</Catch2Adapter>
 </RunSettings>

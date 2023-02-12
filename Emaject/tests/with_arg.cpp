@@ -33,7 +33,8 @@ namespace
         void onBinding(Container* c) const
         {
             c->bind<ICounter>()
-                .toWith<Counter>(100)
+                .to<Counter>()
+                .fromArgs(100)
                 .asTransient();
         }
     };

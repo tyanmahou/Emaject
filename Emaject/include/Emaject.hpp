@@ -37,6 +37,9 @@ namespace emaject
         {
             typename Type::CtorInject;
         };
+
+        template <class Type>
+        concept DefaultInstantiatable = detail::CtorInjectable<Type> || std::default_initializable<Type>;
     }
 
     /// <summary>
@@ -44,6 +47,30 @@ namespace emaject
     /// </summary>
     class Container
     {
+    public:
+        template<class Type, int ID = 0>
+        [[nodiscard]] auto bind()
+        {
+            return Binder<Type, ID>(this);
+        }
+
+        template<class Type, int ID = 0>
+        [[nodiscard]] std::shared_ptr<Type> resolve()
+        {
+            const auto& id = resolveId<Type, ID>();
+            if (m_bindInfos.find(id) == m_bindInfos.end()) {
+                return Resolver<Type>{}(this, this->instantiate<Type>());
+            }
+            auto&& [factory, createKind, cache] = std::any_cast<BindInfo<Type>&>(m_bindInfos.at(id));
+            if (createKind != ScopeKind::Transient) {
+                if (!cache) {
+                    cache = factory();
+                }
+                return std::static_pointer_cast<Type>(cache);
+            }
+            return std::static_pointer_cast<Type>(factory());
+        }
+    private:
         enum class ScopeKind
         {
             Transient,
@@ -63,28 +90,182 @@ namespace emaject
             ScopeKind kind;
             std::shared_ptr<Type> cache;
         };
+
+        template<class Type, int ID>
+        class Binder
+        {
+        public:
+            Binder(Container* c) :
+                m_container(c)
+            {}
+        public:
+            template<class To>
+            [[nodiscard]] auto to() const
+            {
+                return FromDescriptor<Type, To, ID>(m_container);
+            }
+            [[nodiscard]] auto toSelf() const
+            {
+                return FromDescriptor<Type, Type, ID>(m_container);
+            }
+        public:
+            [[nodiscard]] auto fromNew() const requires detail::DefaultInstantiatable<Type>
+            {
+                return toSelf().fromNew();
+            }
+            template<class... Args>
+            [[nodiscard]] auto fromArgs(Args&&... args) const requires std::constructible_from<Type, Args...>
+            {
+                return toSelf().fromArgs(std::forward<Args>(args)...);
+            }
+            [[nodiscard]] auto fromInstance(const std::shared_ptr<Type>& instance) const
+            {
+                return toSelf().fromInstance(instance);
+            }
+            [[nodiscard]] auto fromFactory(const Factory<Type>& factory) const
+            {
+                return toSelf().fromFactory(factory);
+            }
+            [[nodiscard]] auto unused() const
+            {
+                return toSelf().unused();
+            }
+        public:
+            bool asTransient() const requires detail::DefaultInstantiatable<Type>
+            {
+                return fromNew().asTransient();
+            }
+            bool asCache() const requires detail::DefaultInstantiatable<Type>
+            {
+                return fromNew().asCache();
+            }
+            bool asSingle() const requires detail::DefaultInstantiatable<Type> && (ID == 0)
+            {
+                return fromNew().asSingle();
+            }
+        private:
+            Container* m_container;
+        };
+
+        template<class From, class To, int ID>
+        class FromDescriptor
+        {
+        public:
+            FromDescriptor(Container* c) :
+                m_container(c)
+            {}
+        public:
+            [[nodiscard]] auto fromNew() const requires detail::DefaultInstantiatable<To>
+            {
+                return fromFactory([c = m_container] {
+                    return c->instantiate<To>();
+                });
+            }
+            template<class... Args>
+            [[nodiscard]] auto fromArgs(Args&&... args) const requires std::constructible_from<To, Args...>
+            {
+                return fromFactory([...args = std::forward<Args>(args)] {
+                    // not allow move becouse transient
+                    return std::make_shared<To>(args...);
+                });
+            }
+            [[nodiscard]] auto fromInstance(const std::shared_ptr<To>& instance) const
+            {
+                return fromFactory([i = instance] {
+                    return i;
+                });
+            }
+            [[nodiscard]] auto fromFactory(const Factory<To>& factory) const
+            {
+                return ScopeDescriptor<From, ID>(m_container, [c = m_container, factory] {
+                    return Resolver<To>{}(c, factory);
+                });
+            }
+            [[nodiscard]] auto unused() const
+            {
+                return fromFactory([] {
+                    return nullptr;
+                });
+            }
+        public:
+            bool asTransient() const requires detail::DefaultInstantiatable<To>
+            {
+                return fromNew().asTransient();
+            }
+            bool asCache() const requires detail::DefaultInstantiatable<To>
+            {
+                return fromNew().asCache();
+            }
+            bool asSingle() const requires detail::DefaultInstantiatable<To> && (ID == 0)
+            {
+                return fromNew().asSingle();
+            }
+        private:
+            Container* m_container;
+        };
+        template<class Type, int ID>
+        class ScopeDescriptor
+        {
+        public:
+            ScopeDescriptor(Container* c, const Factory<Type>& f) :
+                m_container(c),
+                m_factory(f)
+            {}
+        public:
+            bool asTransient() const
+            {
+                return m_container
+                    ->regist<Type, ID>({ m_factory, ScopeKind::Transient, nullptr });
+            }
+            bool asCache() const
+            {
+                return m_container
+                    ->regist<Type, ID>({ m_factory, ScopeKind::Cache, nullptr });
+            }
+            bool asSingle() const requires (ID == 0)
+            {
+                return m_container
+                    ->regist<Type, ID>({ m_factory, ScopeKind::Single, nullptr });
+            }
+        private:
+            Container* m_container;
+            Factory<Type> m_factory;
+        };
+
         template<class Type>
-        struct Builder
+        struct Instantiater
         {
             template<class T>
             struct ctor {};
             template<class T, class... Args>
             struct ctor<T(Args...)>
             {
-                auto operator()(Container* c)
+                auto operator()(Container* c) const
                 {
-                    return  std::make_shared<Type>(c->resolve<typename std::decay_t<Args>::element_type>()...);
+                    return std::make_shared<T>(c->resolve<typename std::decay_t<Args>::element_type>()...);
                 }
             };
 
-            auto operator()(Container* c)
+            auto operator()(Container* c) const
             {
-                std::shared_ptr<Type> ret;
                 if constexpr (detail::CtorInjectable<Type>) {
-                    ret = ctor<typename Type::CtorInject>{}(c);
+                    return ctor<typename Type::CtorInject>{}(c);
+                } else if constexpr (std::default_initializable<Type>) {
+                    return std::make_shared<Type>();
                 } else {
-                    ret = std::make_shared<Type>();
+                    return nullptr;
                 }
+            }
+        };
+        template<class Type>
+        struct Resolver
+        {
+            auto operator()(Container* c, Factory<Type> factory) const
+            {
+                return (*this)(c, factory());
+            }
+            auto operator()(Container* c, std::shared_ptr<Type> ret) const
+            {
                 if constexpr (detail::FieldInjectable<Type>) {
                     if (ret) {
                         detail::FieldInjecter<Type>{}.onInject(ret.get(), c);
@@ -98,110 +279,17 @@ namespace emaject
                 return ret;
             }
         };
-
+    private:
         template<class Type>
-        std::shared_ptr<Type> build()
+        [[nodiscard]] std::shared_ptr<Type> instantiate()
         {
-            if constexpr (!std::is_abstract_v<Type>) {
-                return Builder<Type>{}(this);
-            } else {
-                return nullptr;
-            }
+            return Instantiater<Type>{}(this);
         }
-        template<class Type, int ID>
-        class ScopeRegister
-        {
-        private:
-            Container* m_container;
-            Factory<Type> m_factory;
-        public:
-            ScopeRegister(Container* c, const Factory<Type>& f) :
-                m_container(c),
-                m_factory(f)
-            {}
-            bool asTransient() const
-            {
-                return m_container
-                    ->bindRegist<Type, ID>(BindInfo<Type>{m_factory, ScopeKind::Transient, nullptr});
-            }
-            bool asCache() const
-            {
-                return m_container
-                    ->bindRegist<Type, ID>(BindInfo<Type>{m_factory, ScopeKind::Cache, nullptr });
-            }
-            bool asSingle() const requires (ID == 0)
-            {
-                return m_container
-                    ->bindRegist<Type, ID>(BindInfo<Type>{m_factory, ScopeKind::Single, nullptr });
-            }
-        };
-        template<class Type, int ID>
-        class Binder
-        {
-        private:
-            Container* m_container;
-        public:
-            Binder(Container* c) :
-                m_container(c)
-            {}
 
-            template<class U>
-            [[nodiscard]] auto to() const requires !std::is_abstract_v<U>
-            {
-                return fromFactory([c = m_container]() {
-                    return c->build<U>();
-                });
-            }
-            template<class U, class... Args>
-            [[nodiscard]] auto toWith(Args&&... args) const requires !std::is_abstract_v<U> && std::constructible_from<U, Args...>
-            {
-                return fromFactory([...args = std::forward<Args>(args)]{
-                    // not allow move becouse transient
-                    return std::make_shared<U>(args...);
-                });
-            }
-            [[nodiscard]] auto toSelf() const requires !std::is_abstract_v<Type>
-            {
-                return to<Type>();
-            }
-            template<class... Args>
-            [[nodiscard]] auto toSelfWith(Args&&... args) const requires !std::is_abstract_v<Type> && std::constructible_from<Type, Args...>
-            {
-                return toWith<Type>(std::forward<Args>(args)...);
-            }
-            [[nodiscard]] auto fromInstance(const std::shared_ptr<Type>& instance) const
-            {
-                return fromFactory([i = instance]() {
-                    return i;
-                });
-            }
-            [[nodiscard]] auto fromFactory(const Factory<Type>& factory) const
-            {
-                return ScopeRegister<Type, ID>(m_container, factory);
-            }
-            [[nodiscard]] auto unused() const
-            {
-                return fromFactory([]{
-                    return nullptr;
-                });
-            }
-            bool asTransient() const requires !std::is_abstract_v<Type>
-            {
-                return toSelf().asTransient();
-            }
-            bool asCache() const requires !std::is_abstract_v<Type>
-            {
-                return toSelf().asCache();
-            }
-            bool asSingle() const requires !std::is_abstract_v<Type>
-            {
-                return toSelf().asSingle();
-            }
-        };
         template<class Type, int ID>
-        bool bindRegist(const BindInfo<Type>& info)
+        bool regist(const BindInfo<Type>& info)
         {
-            const auto& id = info.kind == ScopeKind::Single ? typeid(Type) :typeid(Tag<Type, ID>);
+            const auto& id = info.kind == ScopeKind::Single ? typeid(Type) : typeid(Tag<Type, ID>);
             if (m_bindInfos.find(id) != m_bindInfos.end()) {
                 return false;
             }
@@ -217,29 +305,6 @@ namespace emaject
                 return singleId;
             }
             return typeid(Tag<Type, ID>);
-        }
-    public:
-        template<class Type, int ID = 0>
-        [[nodiscard]] auto bind()
-        {
-            return Binder<Type, ID>(this);
-        }
-
-        template<class Type, int ID = 0>
-        [[nodiscard]] std::shared_ptr<Type> resolve()
-        {
-            const auto& id = resolveId<Type, ID>();
-            if (m_bindInfos.find(id) == m_bindInfos.end()) {
-                return this->build<Type>();
-            }
-            auto&& [factory, createKind, cache] = std::any_cast<BindInfo<Type>&>(m_bindInfos.at(id));
-            if (createKind != ScopeKind::Transient) {
-                if (!cache) {
-                    cache = factory();
-                }
-                return std::static_pointer_cast<Type>(cache);
-            }
-            return std::static_pointer_cast<Type>(factory());
         }
     private:
         std::unordered_map<std::type_index, std::any> m_bindInfos;
@@ -259,10 +324,8 @@ namespace emaject
     /// </summary>
     class Injector
     {
-    private:
-        std::shared_ptr<Container> m_container;
     public:
-        Injector():
+        Injector() :
             m_container(std::make_shared<Container>())
         {}
 
@@ -283,6 +346,8 @@ namespace emaject
         {
             return m_container->resolve<Type, ID>();
         }
+    private:
+        std::shared_ptr<Container> m_container;
     };
 
 
@@ -340,7 +405,7 @@ namespace emaject
             ret | AutoInjectLine<LineNum>{c};
         }
         template<IsAutoInjectable Type, size_t ...Seq>
-        void auto_inject_all_impl([[maybe_unused]] Type& ret, Container* c, std::index_sequence<Seq...>)
+        void auto_inject_all_impl(Type& ret, Container* c, std::index_sequence<Seq...>)
         {
             (auto_inject<Type, Seq>(ret, c), ...);
         }

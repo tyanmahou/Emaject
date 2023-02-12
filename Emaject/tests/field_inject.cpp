@@ -50,6 +50,7 @@ namespace
 
     TEST_CASE("field_inject")
     {
+        static_assert(emaject::detail::IsAutoInjectable<HelloWorld>);
         Injector injector;
         injector.install<CoutInstaller>();
 

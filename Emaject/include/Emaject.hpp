@@ -16,16 +16,28 @@ namespace emaject
         //void onInject(Type* value, Container* c)
     };
 
-    template<class Type>
-    concept FieldInjectable = requires(Type * t, Container * c)
+    namespace detail
     {
-        InjectTraits<Type>{}.onInject(t, c);
-    };
-    template<class Type>
-    concept CtorInjectable = requires()
-    {
-        typename Type::CtorInject;
-    };
+        template<class Type>
+        struct FieldInjecter {};
+
+        template<class Type>
+        concept TraitsInjectable = requires(Type * t, Container * c)
+        {
+            InjectTraits<Type>{}.onInject(t, c);
+        };
+
+        template<class Type>
+        concept FieldInjectable = requires(Type * t, Container * c)
+        {
+            FieldInjecter<Type>{}.onInject(t, c);
+        };
+        template<class Type>
+        concept CtorInjectable = requires()
+        {
+            typename Type::CtorInject;
+        };
+    }
 
     /// <summary>
     /// Container
@@ -68,12 +80,17 @@ namespace emaject
             auto operator()(Container* c)
             {
                 std::shared_ptr<Type> ret;
-                if constexpr (CtorInjectable<Type>) {
+                if constexpr (detail::CtorInjectable<Type>) {
                     ret = ctor<typename Type::CtorInject>{}(c);
                 } else {
                     ret = std::make_shared<Type>();
                 }
-                if constexpr (FieldInjectable<Type>) {
+                if constexpr (detail::FieldInjectable<Type>) {
+                    if (ret) {
+                        detail::FieldInjecter<Type>{}.onInject(ret.get(), c);
+                    }
+                }
+                if constexpr (detail::TraitsInjectable<Type>) {
                     if (ret) {
                         InjectTraits<Type>{}.onInject(ret.get(), c);
                     }
@@ -313,16 +330,16 @@ namespace emaject
         {
             auto_inject_all_impl(ret, c, make_sequence<Type>());
         }
-    }
 
-    template<detail::IsAutoInjectable Type>
-    struct InjectTraits<Type>
-    {
-        void onInject(Type* value, Container* c)
+        template<IsAutoInjectable Type>
+        struct FieldInjecter<Type>
         {
-            detail::auto_inject_all(*value, c);
-        }
-    };
+            void onInject(Type* value, Container* c)
+            {
+                detail::auto_inject_all(*value, c);
+            }
+        };
+    }
 }
 
 //----------------------------------------

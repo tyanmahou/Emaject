@@ -142,9 +142,19 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="include\Emaject.hpp" />
+    <ClInclude Include="tests\catch.hpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="examples\field_inject\main.cpp" />
+    <ClCompile Include="tests\cache.cpp" />
+    <ClCompile Include="tests\ctor_inject.cpp" />
+    <ClCompile Include="tests\field_inject.cpp" />
+    <ClCompile Include="tests\helloworld.cpp" />
+    <ClCompile Include="tests\inject_taits.cpp" />
+    <ClCompile Include="tests\lambda_install.cpp" />
+    <ClCompile Include="tests\tests.cpp" />
+    <ClCompile Include="tests\single.cpp" />
+    <ClCompile Include="tests\transient.cpp" />
+    <ClCompile Include="tests\use_id.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -152,7 +152,7 @@ namespace emaject
                     return c->build<U>();
                 });
             }
-            [[nodiscard]] auto toSelf() const
+            [[nodiscard]] auto toSelf() const requires !std::is_abstract_v<Type>
             {
                 return to<Type>();
             }
@@ -166,15 +166,15 @@ namespace emaject
             {
                 return ScopeRegister<Type, ID>(m_container, factory);
             }
-            bool asTransient() const
+            bool asTransient() const requires !std::is_abstract_v<Type>
             {
                 return toSelf().asTransient();
             }
-            bool asCache() const
+            bool asCache() const requires !std::is_abstract_v<Type>
             {
                 return toSelf().asCache();
             }
-            bool asSingle() const
+            bool asSingle() const requires !std::is_abstract_v<Type>
             {
                 return toSelf().asSingle();
             }

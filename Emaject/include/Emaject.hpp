@@ -57,11 +57,11 @@ namespace emaject
         template<class Type, int ID = 0>
         [[nodiscard]] std::shared_ptr<Type> resolve()
         {
-            const auto& id = resolveId<Type, ID>();
-            if (m_bindInfos.find(id) == m_bindInfos.end()) {
+            auto itr = resolveItr<Type, ID>();
+            if (itr == m_bindInfos.end()) {
                 return Resolver<Type>{}(this, this->instantiate<Type>());
             }
-            auto&& [factory, createKind, cache] = std::any_cast<BindInfo<Type>&>(m_bindInfos.at(id));
+            auto&& [factory, createKind, cache] = std::any_cast<BindInfo<Type>&>(itr->second);
             if (createKind != ScopeKind::Transient) {
                 if (!cache) {
                     cache = factory();
@@ -298,13 +298,13 @@ namespace emaject
         }
 
         template<class Type, int ID = 0>
-        const std::type_info& resolveId() const
+        auto resolveItr()
         {
-            const auto& singleId = typeid(Type);
-            if (m_bindInfos.find(singleId) != m_bindInfos.end()) {
-                return singleId;
+            auto it = m_bindInfos.find(typeid(Type));
+            if (it != m_bindInfos.end()) {
+                return it;
             }
-            return typeid(Tag<Type, ID>);
+            return  m_bindInfos.find(typeid(Tag<Type, ID>));
         }
     private:
         std::unordered_map<std::type_index, std::any> m_bindInfos;

@@ -58,7 +58,7 @@ namespace emaject
         template<class Type, int ID = 0>
         [[nodiscard]] std::shared_ptr<Type> resolve()
         {
-            auto itr = resolveItr<Type, ID>();
+            auto itr = m_bindInfos.find(typeid(Tag<Type, ID>));
             if (itr == m_bindInfos.end()) {
                 return Resolver<Type>{}(this, this->instantiate<Type>());
             }
@@ -313,16 +313,6 @@ namespace emaject
             }
             deref.bindIds.push_back(id);
             return true;
-        }
-
-        template<class Type, int ID = 0>
-        auto resolveItr()
-        {
-            auto it = m_bindInfos.find(typeid(Type));
-            if (it != m_bindInfos.end()) {
-                return it;
-            }
-            return  m_bindInfos.find(typeid(Tag<Type, ID>));
         }
     private:
         std::unordered_map<std::type_index, std::any> m_bindInfos;

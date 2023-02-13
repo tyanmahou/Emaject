@@ -4,6 +4,7 @@
 #include <functional>
 #include <any>
 #include <unordered_map>
+#include <vector>
 #include <typeindex>
 
 namespace emaject
@@ -90,7 +91,11 @@ namespace emaject
             ScopeKind kind;
             std::shared_ptr<Type> cache;
         };
-
+        struct DerefInfo
+        {
+            bool isSingle = false;
+            std::vector<std::type_index> bindIds;
+        };
         template<class Type, int ID>
         class Binder
         {
@@ -139,7 +144,7 @@ namespace emaject
             {
                 return fromNew().asCache();
             }
-            bool asSingle() const requires detail::DefaultInstantiatable<Type> && (ID == 0)
+            bool asSingle() const requires detail::DefaultInstantiatable<Type>
             {
                 return fromNew().asSingle();
             }
@@ -177,7 +182,7 @@ namespace emaject
             }
             [[nodiscard]] auto fromFactory(const Factory<To>& factory) const
             {
-                return ScopeDescriptor<From, ID>(m_container, [c = m_container, factory] {
+                return ScopeDescriptor<From, To, ID>(m_container, [c = m_container, factory] {
                     return Resolver<To>{}(c, factory);
                 });
             }
@@ -196,18 +201,18 @@ namespace emaject
             {
                 return fromNew().asCache();
             }
-            bool asSingle() const requires detail::DefaultInstantiatable<To> && (ID == 0)
+            bool asSingle() const requires detail::DefaultInstantiatable<To>
             {
                 return fromNew().asSingle();
             }
         private:
             Container* m_container;
         };
-        template<class Type, int ID>
+        template<class From, class To, int ID>
         class ScopeDescriptor
         {
         public:
-            ScopeDescriptor(Container* c, const Factory<Type>& f) :
+            ScopeDescriptor(Container* c, const Factory<To>& f) :
                 m_container(c),
                 m_factory(f)
             {}
@@ -215,21 +220,21 @@ namespace emaject
             bool asTransient() const
             {
                 return m_container
-                    ->regist<Type, ID>({ m_factory, ScopeKind::Transient, nullptr });
+                    ->regist<From, To, ID>({ m_factory, ScopeKind::Transient, nullptr });
             }
             bool asCache() const
             {
                 return m_container
-                    ->regist<Type, ID>({ m_factory, ScopeKind::Cache, nullptr });
+                    ->regist<From, To, ID>({ m_factory, ScopeKind::Cache, nullptr });
             }
-            bool asSingle() const requires (ID == 0)
+            bool asSingle() const
             {
                 return m_container
-                    ->regist<Type, ID>({ m_factory, ScopeKind::Single, nullptr });
+                    ->regist<From, To, ID>({ m_factory, ScopeKind::Single, nullptr });
             }
         private:
             Container* m_container;
-            Factory<Type> m_factory;
+            Factory<To> m_factory;
         };
 
         template<class Type>
@@ -286,14 +291,27 @@ namespace emaject
             return Instantiater<Type>{}(this);
         }
 
-        template<class Type, int ID>
-        bool regist(const BindInfo<Type>& info)
+        template<class From, class To, int ID>
+        bool regist(const BindInfo<From>& info)
         {
-            const auto& id = info.kind == ScopeKind::Single ? typeid(Type) : typeid(Tag<Type, ID>);
+            auto& deref = m_derefInfos[typeid(To)];
+            if (deref.isSingle) {
+                return false;
+            }
+            const auto& id = typeid(Tag<From, ID>);
             if (m_bindInfos.find(id) != m_bindInfos.end()) {
                 return false;
             }
             m_bindInfos[id] = info;
+            if (info.kind == ScopeKind::Single) {
+                // remove duplicated bind
+                for (const auto& bindId : deref.bindIds) {
+                    m_bindInfos.erase(bindId);
+                }
+                deref.bindIds.clear();
+                deref.isSingle = true;
+            }
+            deref.bindIds.push_back(id);
             return true;
         }
 
@@ -308,6 +326,7 @@ namespace emaject
         }
     private:
         std::unordered_map<std::type_index, std::any> m_bindInfos;
+        std::unordered_map<std::type_index, DerefInfo> m_derefInfos;
     };
 
     /// <summary>

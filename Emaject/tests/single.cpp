@@ -1,5 +1,5 @@
 #include <Emaject.hpp>
-
+#include <iostream>
 #include "catch.hpp"
 
 namespace
@@ -13,8 +13,12 @@ namespace
     public:
         virtual int countUp() = 0;
     };
-
-    class Counter : public ICounter
+    class IPrinter
+    {
+    public:
+        virtual void println(std::string_view str) const = 0;
+    };
+    class PrintCounter : public ICounter, public IPrinter
     {
         int m_count;
     public:
@@ -22,20 +26,30 @@ namespace
         {
             return ++m_count;
         }
+        void println(std::string_view str) const override
+        {
+            std::cout << "[single]" << str << " " << m_count << std::endl;
+        }
     };
 
     struct CounterInstaller : IInstaller
     {
         void onBinding(Container* c) const
         {
+            // failed
+            c->bind<ICounter, 1>()
+                .to<PrintCounter>()
+                .asCache();
+
+            // prioritize resolution
             c->bind<ICounter>()
-                .to<Counter>()
+                .to<PrintCounter>()
                 .asSingle();
 
-            // compile error "don't use ID"
-            //c->bind<ICounter, 1>()
-            //    .to<Counter>()
-            //    .asSingle();
+            // failed
+            c->bind<IPrinter>()
+                .to<PrintCounter>()
+                .asTransient();
         }
     };
 
@@ -45,12 +59,22 @@ namespace
         injector.install<CounterInstaller>();
 
         {
-            auto counter = injector.resolve<ICounter, 0>(); // new instance
+            auto counter = injector.resolve<ICounter, 0>(); // new instance(single)
+            REQUIRE(counter != nullptr);
             REQUIRE(counter->countUp() == 1);
         }
         {
-            auto counter = injector.resolve<ICounter, 1>(); // used cache
-            REQUIRE(counter->countUp() == 2);
+            auto counter1 = injector.resolve<ICounter, 0>(); // cached
+            auto counter2 = injector.resolve<ICounter, 0>(); // cached
+            REQUIRE(counter1 == counter2);
+        }
+        {
+            auto counter = injector.resolve<ICounter, 1>(); // failed
+            REQUIRE(counter == nullptr);
+        }
+        {
+            auto printer = injector.resolve<IPrinter>(); // failed
+            REQUIRE(printer == nullptr);
         }
     }
 }

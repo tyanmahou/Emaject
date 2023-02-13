@@ -33,7 +33,7 @@ struct CoutInstaller : IInstaller
     {
         c->bind<IPrinter>()
             .to<CoutPrinter>()
-            .asCache();
+            .asCached();
     }
 };
 
@@ -70,7 +70,7 @@ int main()
     Injector injector;
     injector.install<CoutInstaller>();
 
-    auto helloWorld = injector.resolve<HelloWorld>();
+    auto helloWorld = injector.instantiate<HelloWorld>();
     helloWorld->greet();
 }
 ```
@@ -134,7 +134,7 @@ struct PrintfInstaller : IInstaller
         // ID = 1 -> PrintfPrinter
         c->bind<IPrinter, 1>()
             .to<PrintfPrinter>()
-            .asCache();
+            .asCached();
     }
 };
 ```
@@ -198,9 +198,9 @@ int main()
 }
 ```
 
-#### Cache
+#### Cached
 
-If you use `asCache`, the one cached by the ID will be reused.
+If you use `asCached`, the one cached by the ID will be reused.
 
 ```cpp
 struct CounterInstaller : IInstaller
@@ -209,7 +209,7 @@ struct CounterInstaller : IInstaller
     {
         container->bind<ICounter>()
             .to<Counter>()
-            .asCache();
+            .asCached();
     }
 };
 
@@ -231,8 +231,7 @@ int main()
 
 #### Single
 
-If you use `asSingle`, the cached one will be reused regardless of the ID.
-ID cannot be used in binding that used this.
+If you use `asSingle`, the cached one will be reused and you can't bind to same type.
 
 ```cpp
 struct CounterInstaller : IInstaller
@@ -243,10 +242,10 @@ struct CounterInstaller : IInstaller
             .to<Counter>()
             .asSingle();
 
-        // compile error "don't use ID"
-        //c->bind<ICounter, 1>()
-        //    .to<Counter>()
-        //    .asSingle();
+        // failed Counter is Already bind to
+        c->bind<Counter>()
+            .to<Counter>()
+            .asSingle();
     }
 };
 
@@ -256,12 +255,15 @@ int main()
     injector.install<CounterInstaller>();
 
     {
-        auto counter = injector.resolve<ICounter, 0>(); // new instance
+        auto counter = injector.resolve<ICounter>(); // new instance
         std::cout << counter->countUp() << std::endl;   // 1
     }
     {
-        auto counter = injector.resolve<ICounter, 1>(); // used cache
+        auto counter = injector.resolve<ICounter>(); // used cache
         std::cout << counter->countUp() << std::endl;   // 2 
+    }
+    {
+        auto counter = injector.resolve<Counter>(); // nullptr
     }
 }
 ```

@@ -54,7 +54,7 @@ namespace
         Injector injector;
         injector.install<CoutInstaller>();
 
-        auto helloWorld = injector.resolve<HelloWorld>();
+        auto helloWorld = injector.instantiate<HelloWorld>();
         helloWorld->greet();
     }
 }

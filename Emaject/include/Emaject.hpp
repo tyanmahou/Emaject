@@ -20,7 +20,7 @@ namespace emaject
     namespace detail
     {
         template<class Type>
-        struct FieldInjecter {};
+        struct FieldInjector {};
 
         template<class Type>
         concept TraitsInjectable = requires(Type * t, Container * c)
@@ -31,7 +31,7 @@ namespace emaject
         template<class Type>
         concept FieldInjectable = requires(Type * t, Container * c)
         {
-            FieldInjecter<Type>{}.onInject(t, c);
+            FieldInjector<Type>{}.onInject(t, c);
         };
         template<class Type>
         concept CtorInjectable = requires()
@@ -55,12 +55,19 @@ namespace emaject
             return Binder<Type, ID>(this);
         }
 
+        template<class Type>
+        [[nodiscard]] std::shared_ptr<Type> instantiate()
+        {
+            auto ret = this->makeInstance<Type>();
+            this->inject(ret.get());
+            return ret;
+        }
         template<class Type, int ID = 0>
         [[nodiscard]] std::shared_ptr<Type> resolve()
         {
             auto itr = m_bindInfos.find(typeid(Tag<Type, ID>));
             if (itr == m_bindInfos.end()) {
-                return Resolver<Type>{}(this, this->instantiate<Type>());
+                return nullptr;
             }
             auto&& [factory, createKind, cache] = std::any_cast<BindInfo<Type>&>(itr->second);
             if (createKind != ScopeKind::Transient) {
@@ -70,6 +77,21 @@ namespace emaject
                 return std::static_pointer_cast<Type>(cache);
             }
             return std::static_pointer_cast<Type>(factory());
+        }
+
+        template<class Type>
+        void inject(Type* value)
+        {
+            if constexpr (detail::FieldInjectable<Type>) {
+                if (value) {
+                    detail::FieldInjector<Type>{}.onInject(value, this);
+                }
+            }
+            if constexpr (detail::TraitsInjectable<Type>) {
+                if (value) {
+                    InjectTraits<Type>{}.onInject(value, this);
+                }
+            }
         }
     private:
         enum class ScopeKind
@@ -119,9 +141,9 @@ namespace emaject
                 return toSelf().fromNew();
             }
             template<class... Args>
-            [[nodiscard]] auto fromArgs(Args&&... args) const requires std::constructible_from<Type, Args...>
+            [[nodiscard]] auto withArgs(Args&&... args) const requires std::constructible_from<Type, Args...>
             {
-                return toSelf().fromArgs(std::forward<Args>(args)...);
+                return toSelf().withArgs(std::forward<Args>(args)...);
             }
             [[nodiscard]] auto fromInstance(const std::shared_ptr<Type>& instance) const
             {
@@ -167,11 +189,13 @@ namespace emaject
                 });
             }
             template<class... Args>
-            [[nodiscard]] auto fromArgs(Args&&... args) const requires std::constructible_from<To, Args...>
+            [[nodiscard]] auto withArgs(Args&&... args) const requires std::constructible_from<To, Args...>
             {
-                return fromFactory([...args = std::forward<Args>(args)] {
+                return fromFactory([c = m_container, ...args = std::forward<Args>(args)] {
                     // not allow move becouse transient
-                    return std::make_shared<To>(args...);
+                    auto ret = std::make_shared<To>(args...);
+                    c->inject(ret.get());
+                    return ret;
                 });
             }
             [[nodiscard]] auto fromInstance(const std::shared_ptr<To>& instance) const
@@ -182,9 +206,7 @@ namespace emaject
             }
             [[nodiscard]] auto fromFactory(const Factory<To>& factory) const
             {
-                return ScopeDescriptor<From, To, ID>(m_container, [c = m_container, factory] {
-                    return Resolver<To>{}(c, factory);
-                });
+                return ScopeDescriptor<From, To, ID>(m_container, factory);
             }
             [[nodiscard]] auto unused() const
             {
@@ -262,31 +284,9 @@ namespace emaject
                 }
             }
         };
-        template<class Type>
-        struct Resolver
-        {
-            auto operator()(Container* c, Factory<Type> factory) const
-            {
-                return (*this)(c, factory());
-            }
-            auto operator()(Container* c, std::shared_ptr<Type> ret) const
-            {
-                if constexpr (detail::FieldInjectable<Type>) {
-                    if (ret) {
-                        detail::FieldInjecter<Type>{}.onInject(ret.get(), c);
-                    }
-                }
-                if constexpr (detail::TraitsInjectable<Type>) {
-                    if (ret) {
-                        InjectTraits<Type>{}.onInject(ret.get(), c);
-                    }
-                }
-                return ret;
-            }
-        };
     private:
         template<class Type>
-        [[nodiscard]] std::shared_ptr<Type> instantiate()
+        [[nodiscard]] std::shared_ptr<Type> makeInstance()
         {
             return Instantiater<Type>{}(this);
         }
@@ -349,6 +349,12 @@ namespace emaject
         {
             installer(m_container.get());
             return *this;
+        }
+
+        template<class Type>
+        [[nodiscard]] std::shared_ptr<Type> instantiate() requires detail::DefaultInstantiatable<Type>
+        {
+            return m_container->instantiate<Type>();
         }
         template<class Type, int ID = 0>
         [[nodiscard]] std::shared_ptr<Type> resolve()
@@ -425,7 +431,7 @@ namespace emaject
         }
 
         template<IsAutoInjectable Type>
-        struct FieldInjecter<Type>
+        struct FieldInjector<Type>
         {
             void onInject(Type* value, Container* c)
             {

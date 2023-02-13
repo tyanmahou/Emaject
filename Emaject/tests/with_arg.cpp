@@ -34,7 +34,7 @@ namespace
         {
             c->bind<ICounter>()
                 .to<Counter>()
-                .fromArgs(100)
+                .withArgs(100)
                 .asTransient();
         }
     };

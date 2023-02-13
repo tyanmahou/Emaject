@@ -69,7 +69,7 @@ namespace
             REQUIRE(counter->countUp() == 2);
         }
         {
-            auto test = injector.resolve<Test>();
+            auto test = injector.instantiate<Test>();
             REQUIRE(test->c1 != nullptr);
             REQUIRE(test->c2 != nullptr);
             REQUIRE(test->c3 != nullptr);

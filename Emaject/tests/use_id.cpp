@@ -80,7 +80,7 @@ namespace
             .install<CoutInstaller>()
             .install<PrintfInstaller>();
 
-        auto helloWorld = injector.resolve<HelloWorld>();
+        auto helloWorld = injector.instantiate<HelloWorld>();
         helloWorld->greet();
     }
 }

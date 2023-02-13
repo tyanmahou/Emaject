@@ -14,22 +14,12 @@ namespace
         virtual int countUp() = 0;
     };
 
-    class Counter : public ICounter
-    {
-        int m_count;
-    public:
-        int countUp() override
-        {
-            return ++m_count;
-        }
-    };
-
     struct CounterInstaller : IInstaller
     {
         void onBinding(Container* c) const
         {
             // Unused
-            c->bind<Counter, 0>()
+            c->bind<ICounter, 0>()
                 .unused()
                 .asTransient();
         }
@@ -41,12 +31,12 @@ namespace
         injector.install<CounterInstaller>();
 
         {
-            auto counter = injector.resolve<Counter>();
+            auto counter = injector.resolve<ICounter>();
             REQUIRE(counter == nullptr);
         }
         {
-            auto counter = injector.resolve<Counter, 1>();
-            REQUIRE(counter != nullptr);
+            auto counter = injector.resolve<ICounter, 1>();
+            REQUIRE(counter == nullptr);
         }
     }
 }

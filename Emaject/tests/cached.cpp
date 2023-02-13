@@ -45,17 +45,17 @@ namespace
         {
             c->bind<ICounter>()
                 .to<Counter>()
-                .asCache();
+                .asCached();
 
             c->bind<ICounter, 2>()
                 .to<Counter>()
-                .asCache();
+                .asCached();
 
             c->bind<Counter>()
-                .asCache();
+                .asCached();
         }
     };
-    TEST_CASE("catch")
+    TEST_CASE("cached")
     {
         Injector injector;
         injector.install<CounterInstaller>();

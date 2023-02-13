@@ -30,7 +30,7 @@ namespace
         {
             c->bind<IPrinter>()
                 .to<CoutPrinter>()
-                .asCache();
+                .asCached();
         }
     };
 

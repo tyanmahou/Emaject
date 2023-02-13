@@ -39,7 +39,7 @@ namespace
             // failed
             c->bind<ICounter, 1>()
                 .to<PrintCounter>()
-                .asCache();
+                .asCached();
 
             // prioritize resolution
             c->bind<ICounter>()

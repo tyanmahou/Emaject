@@ -75,7 +75,7 @@ namespace emaject
         enum class ScopeKind
         {
             Transient,
-            Cache,
+            Cached,
             Single
         };
         template<class Type, int ID>
@@ -140,9 +140,9 @@ namespace emaject
             {
                 return fromNew().asTransient();
             }
-            bool asCache() const requires detail::DefaultInstantiatable<Type>
+            bool asCached() const requires detail::DefaultInstantiatable<Type>
             {
-                return fromNew().asCache();
+                return fromNew().asCached();
             }
             bool asSingle() const requires detail::DefaultInstantiatable<Type>
             {
@@ -197,9 +197,9 @@ namespace emaject
             {
                 return fromNew().asTransient();
             }
-            bool asCache() const requires detail::DefaultInstantiatable<To>
+            bool asCached() const requires detail::DefaultInstantiatable<To>
             {
-                return fromNew().asCache();
+                return fromNew().asCached();
             }
             bool asSingle() const requires detail::DefaultInstantiatable<To>
             {
@@ -222,10 +222,10 @@ namespace emaject
                 return m_container
                     ->regist<From, To, ID>({ m_factory, ScopeKind::Transient, nullptr });
             }
-            bool asCache() const
+            bool asCached() const
             {
                 return m_container
-                    ->regist<From, To, ID>({ m_factory, ScopeKind::Cache, nullptr });
+                    ->regist<From, To, ID>({ m_factory, ScopeKind::Cached, nullptr });
             }
             bool asSingle() const
             {

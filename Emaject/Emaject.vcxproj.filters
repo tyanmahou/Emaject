@@ -47,7 +47,7 @@
     <ClCompile Include="tests\use_id.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="tests\cache.cpp">
+    <ClCompile Include="tests\cached.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
     <ClCompile Include="tests\tests.cpp">

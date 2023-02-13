@@ -145,7 +145,7 @@
     <ClInclude Include="tests\catch.hpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="tests\cache.cpp" />
+    <ClCompile Include="tests\cached.cpp" />
     <ClCompile Include="tests\ctor_inject.cpp" />
     <ClCompile Include="tests\field_inject.cpp" />
     <ClCompile Include="tests\helloworld.cpp" />

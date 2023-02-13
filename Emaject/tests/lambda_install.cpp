@@ -31,7 +31,7 @@ namespace
         injector.install([](Container* c) {
             c->bind<IPrinter>()
             .to<CoutPrinter>()
-            .asCache();
+            .asCached();
             });
 
         auto printer = injector.resolve<IPrinter>();

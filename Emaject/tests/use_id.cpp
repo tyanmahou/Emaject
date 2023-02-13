@@ -42,7 +42,7 @@ namespace
             // ID = 0 -> CoutPrinter
             c->bind<IPrinter, 0>()
                 .to<CoutPrinter>()
-                .asCache();
+                .asCached();
         }
     };
     struct PrintfInstaller : IInstaller
@@ -52,7 +52,7 @@ namespace
             // ID = 1 -> PrintfPrinter
             c->bind<IPrinter, 1>()
                 .to<PrintfPrinter>()
-                .asCache();
+                .asCached();
         }
     };
     class HelloWorld

@@ -89,8 +89,8 @@ public:
         m_printer->println("Hello World");
     }
 private:
-    [[INJECT(SetPrinter)]]
-    void SetPrinter(std::shared_ptr<IPrinter> printer)
+    [[INJECT(setPrinter)]]
+    void setPrinter(std::shared_ptr<IPrinter> printer)
     {
         m_printer = printer;
     }
@@ -198,8 +198,8 @@ public:
     }
 private:
 private:
-    [[INJECT(SetPrinter, 0, 1)]]
-    void SetPrinter(std::shared_ptr<IPrinter> printer0, std::shared_ptr<IPrinter> printer1)
+    [[INJECT(setPrinter, 0, 1)]]
+    void setPrinter(std::shared_ptr<IPrinter> printer0, std::shared_ptr<IPrinter> printer1)
     {
         m_printer0 = printer0;
         m_printer1 = printer1;

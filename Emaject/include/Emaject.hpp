@@ -208,6 +208,13 @@ namespace emaject
             {
                 return ScopeDescriptor<From, To, ID>(m_container, factory);
             }
+            template<int RsolveID = 0>
+            [[nodiscard]] auto fromResolve() const
+            {
+                return fromFactory([c = m_container] {
+                    return c->resolve<To, RsolveID>();
+                });
+            }
             [[nodiscard]] auto unused() const
             {
                 return fromFactory([] {

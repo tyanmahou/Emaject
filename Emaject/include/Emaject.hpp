@@ -302,15 +302,13 @@ namespace emaject
             if (m_bindInfos.find(id) != m_bindInfos.end()) {
                 return false;
             }
-            m_bindInfos[id] = info;
             if (info.kind == ScopeKind::Single) {
-                // remove duplicated bind
-                for (const auto& bindId : deref.bindIds) {
-                    m_bindInfos.erase(bindId);
+                if (!deref.bindIds.empty()) {
+                    return false;
                 }
-                deref.bindIds.clear();
                 deref.isSingle = true;
             }
+            m_bindInfos[id] = info;
             deref.bindIds.push_back(id);
             return true;
         }

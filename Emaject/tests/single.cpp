@@ -36,15 +36,14 @@ namespace
     {
         void onBinding(Container* c) const
         {
+            c->bind<ICounter>()
+                .to<PrintCounter>()
+                .asSingle();
+
             // failed
             c->bind<ICounter, 1>()
                 .to<PrintCounter>()
                 .asCached();
-
-            // prioritize resolution
-            c->bind<ICounter>()
-                .to<PrintCounter>()
-                .asSingle();
 
             // failed
             c->bind<IPrinter>()

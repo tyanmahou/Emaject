@@ -20,7 +20,7 @@ namespace emaject
     namespace detail
     {
         template<class Type>
-        struct FieldInjector;
+        struct AutoInjector;
 
         template<auto Method>
         struct MethodInjector;
@@ -32,9 +32,9 @@ namespace emaject
         };
 
         template<class Type>
-        concept FieldInjectable = requires(Type * t, Container * c)
+        concept AutoInjectable = requires(Type * t, Container * c)
         {
-            FieldInjector<Type>{}.onInject(t, c);
+            AutoInjector<Type>{}.onInject(t, c);
         };
 
         template<class Type, auto Method>
@@ -94,9 +94,9 @@ namespace emaject
         template<class Type>
         void inject(Type* value)
         {
-            if constexpr (detail::FieldInjectable<Type>) {
+            if constexpr (detail::AutoInjectable<Type>) {
                 if (value) {
-                    detail::FieldInjector<Type>{}.onInject(value, this);
+                    detail::AutoInjector<Type>{}.onInject(value, this);
                 }
             }
             if constexpr (detail::TraitsInjectable<Type>) {
@@ -454,16 +454,31 @@ namespace emaject
         }
 
         template<class Type>
-        struct FieldInjector
+        struct AutoInjector
         {};
 
         template<IsAutoInjectable Type>
-        struct FieldInjector<Type>
+        struct AutoInjector<Type>
         {
             void onInject(Type* value, Container* c)
             {
                 detail::auto_inject_all(*value, c);
             }
+        };
+
+        template<class T, auto MemP>
+        struct InjectedType{};
+
+        template<class Type, class R, R Type::* MemP>
+        struct InjectedType<R Type::*, MemP>
+        {
+            using type = Type;
+        };
+
+        template<class Type, class R, class... Args, R(Type::* MemP)(Args...)>
+        struct InjectedType<R(Type::*)(Args...), MemP>
+        {
+            using type = Type;
         };
 
         template<auto Method>
@@ -476,28 +491,35 @@ namespace emaject
             template<class Type, class R, class... Args, R(Type::* Method)(Args...)>
             struct impl<R(Type::*)(Args...), Method>
             {
-                using type = Type;
-
                 auto onInject(Type* value, Container* c)
                 {
                     return (value->*Method)(c->resolve<typename std::decay_t<Args>::element_type>()...);
                 }
             };
-            using Type = typename impl<decltype(Method), Method>::type;
+            using Type = typename InjectedType<decltype(Method), Method>::type;
 
             auto onInject(Type* t, Container* c)
             {
                 return impl<decltype(Method), Method>{}.onInject(t, c);
             }
         };
+        template<auto MemP, int ID>
+        struct FieldInjector
+        {
+            using Type = typename InjectedType<decltype(MemP), MemP>::type;
 
+            void onInject(Type* t, Container* c)
+            {
+                t->*MemP = c->resolve<typename std::decay_t<decltype(t->*MemP)>::element_type, ID>();
+            }
+        };
         template<class Type, auto MemP, int ID>
         void AutoInject(Type* value, Container* c)
         {
             if constexpr (::emaject::detail::MethodInjectable<Type, MemP>) {
                 MethodInjector<MemP>{}.onInject(value, c);
             } else {
-                value->*MemP = c->resolve<typename std::decay_t<decltype(value->*MemP)>::element_type, ID>();
+                FieldInjector<MemP, ID>{}.onInject(value, c);
             }
         }
     }

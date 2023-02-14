@@ -74,6 +74,29 @@ int main()
     helloWorld->greet();
 }
 ```
+### Method Inject
+
+This is executed at the same timing as Field Inject.
+
+```cpp
+class HelloWorld
+{
+public:
+    HelloWorld() = default;
+
+    void greet() const
+    {
+        m_printer->println("Hello World");
+    }
+private:
+    [[INJECT(SetPrinter)]]
+    void SetPrinter(std::shared_ptr<IPrinter> printer)
+    {
+        m_printer = printer;
+    }
+    std::shared_ptr<IPrinter> m_printer;
+};
+```
 
 ### Constructor Inject
 
@@ -156,6 +179,32 @@ private:
     std::shared_ptr<IPrinter> m_printer0;
 
     [[INJECT(m_printer1, 1)]] // ID = 1
+    std::shared_ptr<IPrinter> m_printer1;
+};
+```
+
+and method inject.
+
+```cpp
+class HelloWorld
+{
+public:
+    HelloWorld() = default;
+
+    void greet() const
+    {
+        m_printer0->println("Hello World");
+        m_printer1->println("Hello World");
+    }
+private:
+private:
+    [[INJECT(SetPrinter, 0, 1)]]
+    void SetPrinter(std::shared_ptr<IPrinter> printer0, std::shared_ptr<IPrinter> printer1)
+    {
+        m_printer0 = printer0;
+        m_printer1 = printer1;
+    }
+    std::shared_ptr<IPrinter> m_printer0;
     std::shared_ptr<IPrinter> m_printer1;
 };
 ```

@@ -22,7 +22,7 @@ namespace emaject
         template<class Type>
         struct AutoInjector;
 
-        template<auto Method>
+        template<auto Method, int... IDs>
         struct MethodInjector;
 
         template<class Type>
@@ -394,8 +394,11 @@ namespace emaject
     //----------------------------------------
     namespace detail
     {
+#if __clang__
+        inline constexpr size_t AUTO_INJECT_MAX_LINES = 256;
+#else
         inline constexpr size_t AUTO_INJECT_MAX_LINES = 500;
-
+#endif
         template<size_t Line>
         struct AutoInjectLine
         {
@@ -481,7 +484,7 @@ namespace emaject
             using type = Type;
         };
 
-        template<auto Method>
+        template<auto MemP, int... IDs>
         struct MethodInjector
         {
             template<class T, T Method>
@@ -491,16 +494,48 @@ namespace emaject
             template<class Type, class R, class... Args, R(Type::* Method)(Args...)>
             struct impl<R(Type::*)(Args...), Method>
             {
+                using resolves_type = std::tuple<Args...>;
+
+                template<int ID>
+                struct IDType
+                {
+                    static constexpr int id = ID;
+                };
+                using resolves_id = std::tuple<IDType<IDs>...>;
+
+                template<size_t Index>
+                struct TypeId
+                {
+                    using type = typename std::decay_t<std::tuple_element_t<Index, resolves_type>>::element_type;
+                    static consteval int id()
+                    {
+                        if constexpr (Index < sizeof...(IDs)) {
+                            return std::tuple_element_t<Index, resolves_id>::id;
+                        } else {
+                            return 0;
+                        }
+                    }
+                };
+                template<size_t Index>
+                auto resolve(Container* c)
+                {
+                    return c->resolve<TypeId<Index>::type, TypeId<Index>::id()>();
+                }
+                template<size_t... Seq>
+                auto onInject(Type* value, Container* c, std::index_sequence<Seq...>)
+                {
+                    return (value->*MemP)(resolve<Seq>(c)...);
+                }
                 auto onInject(Type* value, Container* c)
                 {
-                    return (value->*Method)(c->resolve<typename std::decay_t<Args>::element_type>()...);
+                    return onInject(value, c, std::make_index_sequence<sizeof...(Args)>());
                 }
             };
-            using Type = typename InjectedType<decltype(Method), Method>::type;
+            using Type = typename InjectedType<decltype(MemP), MemP>::type;
 
             auto onInject(Type* t, Container* c)
             {
-                return impl<decltype(Method), Method>{}.onInject(t, c);
+                return impl<decltype(MemP), MemP>{}.onInject(t, c);
             }
         };
         template<auto MemP, int ID>
@@ -513,11 +548,11 @@ namespace emaject
                 t->*MemP = c->resolve<typename std::decay_t<decltype(t->*MemP)>::element_type, ID>();
             }
         };
-        template<class Type, auto MemP, int ID>
+        template<class Type, auto MemP, int ID = 0, int... IDs>
         void AutoInject(Type* value, Container* c)
         {
             if constexpr (::emaject::detail::MethodInjectable<Type, MemP>) {
-                MethodInjector<MemP>{}.onInject(value, c);
+                MethodInjector<MemP, ID, IDs...>{}.onInject(value, c);
             } else {
                 FieldInjector<MemP, ID>{}.onInject(value, c);
             }
@@ -528,17 +563,21 @@ namespace emaject
 //----------------------------------------
 // Macro
 //----------------------------------------
-
-#define INJECT_PP_IMPL_OVERLOAD(e1, e2, NAME, ...) NAME
-#define INJECT_PP_IMPL_2(value, id) INJECT_PP_IMPL_BASE(value, id, __LINE__)
-#define INJECT_PP_IMPL_BASE(value, id, line) ]];\
-template<class ThisType>\
-friend auto operator|(ThisType& a, const ::emaject::detail::AutoInjectLine<line>& l){\
+#if _MSC_VER
+#define INJECT_IMPL(value, line, ...) ]]\
+friend auto operator|(auto& a, const ::emaject::detail::AutoInjectLine<line>& l){\
     static_assert(line < ::emaject::detail::AUTO_INJECT_MAX_LINES);\
-    ::emaject::detail::AutoInject<ThisType, &ThisType::value, id>(&a, l.container);\
+    using ThisType = std::decay_t<decltype(a)>;\
+    ::emaject::detail::AutoInject<ThisType, &ThisType::value, __VA_ARGS__>(&a, l.container);\
 }[[
-#define INJECT_PP_IMPL_1(value) INJECT_PP_IMPL_2(value, 0)
-#define INJECT_PP_EXPAND( x ) x
-#define INJECT(...) INJECT_PP_EXPAND(INJECT_PP_IMPL_OVERLOAD(__VA_ARGS__, INJECT_PP_IMPL_2, INJECT_PP_IMPL_1)(__VA_ARGS__))
+#else
+#define INJECT_IMPL(value, line, ...) ]]\
+friend auto operator|(auto& a, const ::emaject::detail::AutoInjectLine<line>& l){\
+    static_assert(line < ::emaject::detail::AUTO_INJECT_MAX_LINES);\
+    using ThisType = std::decay_t<decltype(a)>;\
+    ::emaject::detail::AutoInject<ThisType, &ThisType::value __VA_OPT__(,) __VA_ARGS__>(&a, l.container);\
+}[[
+#endif
+#define INJECT(value, ...) INJECT_IMPL(value, __LINE__, __VA_ARGS__)
 
 #define INJECT_CTOR(ctor) using CtorInject = ctor; ctor

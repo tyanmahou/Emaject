@@ -36,7 +36,7 @@ namespace
             return m_hoge->value + m_foo->value;
         }
     private:
-        [[INJECT(setHogeAndFoo)]]
+        [[INJECT(setHogeAndFoo, 1, 2)]]
         void setHogeAndFoo(
             const std::shared_ptr<Hoge>& hoge,
             const std::shared_ptr<Foo>& foo
@@ -52,8 +52,8 @@ namespace
     {
         void onBinding(Container* c) const
         {
-            c->bind<Hoge>().withArgs(10).asTransient();
-            c->bind<Foo>().withArgs(200).asTransient();
+            c->bind<Hoge, 1>().withArgs(10).asTransient();
+            c->bind<Foo, 2>().withArgs(200).asTransient();
         }
     };
 

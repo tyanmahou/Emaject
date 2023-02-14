@@ -152,6 +152,7 @@
     <ClCompile Include="tests\helloworld.cpp" />
     <ClCompile Include="tests\inject_taits.cpp" />
     <ClCompile Include="tests\lambda_install.cpp" />
+    <ClCompile Include="tests\method_inject.cpp" />
     <ClCompile Include="tests\tests.cpp" />
     <ClCompile Include="tests\single.cpp" />
     <ClCompile Include="tests\transient.cpp" />

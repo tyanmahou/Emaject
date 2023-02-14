@@ -20,7 +20,10 @@ namespace emaject
     namespace detail
     {
         template<class Type>
-        struct FieldInjector {};
+        struct FieldInjector;
+
+        template<auto Method>
+        struct MethodInjector;
 
         template<class Type>
         concept TraitsInjectable = requires(Type * t, Container * c)
@@ -33,6 +36,15 @@ namespace emaject
         {
             FieldInjector<Type>{}.onInject(t, c);
         };
+
+        template<class Type, auto Method>
+        concept MethodInjectable = requires(Type * t, Container * c)
+        {
+            requires std::is_member_function_pointer_v<decltype(Method)>;
+            typename MethodInjector<Method>::Type;
+            MethodInjector<Method>{}.onInject(t, c);
+        };
+
         template<class Type>
         concept CtorInjectable = requires()
         {
@@ -441,6 +453,10 @@ namespace emaject
             auto_inject_all_impl(ret, c, make_sequence<Type>());
         }
 
+        template<class Type>
+        struct FieldInjector
+        {};
+
         template<IsAutoInjectable Type>
         struct FieldInjector<Type>
         {
@@ -449,6 +465,41 @@ namespace emaject
                 detail::auto_inject_all(*value, c);
             }
         };
+
+        template<auto Method>
+        struct MethodInjector
+        {
+            template<class T, T Method>
+            struct impl
+            {
+            };
+            template<class Type, class R, class... Args, R(Type::* Method)(Args...)>
+            struct impl<R(Type::*)(Args...), Method>
+            {
+                using type = Type;
+
+                auto onInject(Type* value, Container* c)
+                {
+                    return (value->*Method)(c->resolve<typename std::decay_t<Args>::element_type>()...);
+                }
+            };
+            using Type = typename impl<decltype(Method), Method>::type;
+
+            auto onInject(Type* t, Container* c)
+            {
+                return impl<decltype(Method), Method>{}.onInject(t, c);
+            }
+        };
+
+        template<class Type, auto MemP, int ID>
+        void AutoInject(Type* value, Container* c)
+        {
+            if constexpr (::emaject::detail::MethodInjectable<Type, MemP>) {
+                MethodInjector<MemP>{}.onInject(value, c);
+            } else {
+                value->*MemP = c->resolve<typename std::decay_t<decltype(value->*MemP)>::element_type, ID>();
+            }
+        }
     }
 }
 
@@ -457,11 +508,12 @@ namespace emaject
 //----------------------------------------
 
 #define INJECT_PP_IMPL_OVERLOAD(e1, e2, NAME, ...) NAME
-#define INJECT_PP_IMPL_2(value, id) ]];\
+#define INJECT_PP_IMPL_2(value, id) INJECT_PP_IMPL_BASE(value, id, __LINE__)
+#define INJECT_PP_IMPL_BASE(value, id, line) ]];\
 template<class ThisType>\
-friend auto operator|(ThisType& a, const ::emaject::detail::AutoInjectLine<__LINE__>& l){\
-    static_assert(__LINE__ < ::emaject::detail::AUTO_INJECT_MAX_LINES);\
-    a.value = l.container->resolve<typename decltype(a.value)::element_type, id>();\
+friend auto operator|(ThisType& a, const ::emaject::detail::AutoInjectLine<line>& l){\
+    static_assert(line < ::emaject::detail::AUTO_INJECT_MAX_LINES);\
+    ::emaject::detail::AutoInject<ThisType, &ThisType::value, id>(&a, l.container);\
 }[[
 #define INJECT_PP_IMPL_1(value) INJECT_PP_IMPL_2(value, 0)
 #define INJECT_PP_EXPAND( x ) x

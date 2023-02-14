@@ -519,7 +519,7 @@ namespace emaject
                 template<size_t Index>
                 auto resolve(Container* c)
                 {
-                    return c->resolve<TypeId<Index>::type, TypeId<Index>::id()>();
+                    return c->resolve<typename TypeId<Index>::type, TypeId<Index>::id()>();
                 }
                 template<size_t... Seq>
                 auto onInject(Type* value, Container* c, std::index_sequence<Seq...>)

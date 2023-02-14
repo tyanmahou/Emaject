@@ -72,11 +72,11 @@ namespace emaject
             auto&& [factory, createKind, cache] = std::any_cast<BindInfo<Type>&>(itr->second);
             if (createKind != ScopeKind::Transient) {
                 if (!cache) {
-                    cache = factory();
+                    cache = factory(this);
                 }
                 return std::static_pointer_cast<Type>(cache);
             }
-            return std::static_pointer_cast<Type>(factory());
+            return std::static_pointer_cast<Type>(factory(this));
         }
 
         template<class Type>
@@ -104,7 +104,7 @@ namespace emaject
         struct Tag {};
 
         template<class Type>
-        using Factory = std::function<std::shared_ptr<Type>()>;
+        using Factory = std::function<std::shared_ptr<Type>(Container*)>;
 
         template<class Type>
         struct BindInfo
@@ -184,14 +184,14 @@ namespace emaject
         public:
             [[nodiscard]] auto fromNew() const requires detail::DefaultInstantiatable<To>
             {
-                return fromFactory([c = m_container] {
+                return fromFactory([] (Container* c){
                     return c->instantiate<To>();
                 });
             }
             template<class... Args>
             [[nodiscard]] auto withArgs(Args&&... args) const requires std::constructible_from<To, Args...>
             {
-                return fromFactory([c = m_container, ...args = std::forward<Args>(args)] {
+                return fromFactory([...args = std::forward<Args>(args)](Container* c){
                     // not allow move becouse transient
                     auto ret = std::make_shared<To>(args...);
                     c->inject(ret.get());
@@ -208,16 +208,22 @@ namespace emaject
             {
                 return ScopeDescriptor<From, To, ID>(m_container, factory);
             }
+            [[nodiscard]] auto fromFactory(const std::function<std::shared_ptr<To>()>& factory) const
+            {
+                return fromFactory([factory]([[maybe_unused]] Container* container) {
+                    return factory();
+                });
+            }
             template<int RsolveID = 0>
             [[nodiscard]] auto fromResolve() const
             {
-                return fromFactory([c = m_container] {
+                return fromFactory([](Container* c) {
                     return c->resolve<To, RsolveID>();
                 });
             }
             [[nodiscard]] auto unused() const
             {
-                return fromFactory([] {
+                return fromFactory([]{
                     return nullptr;
                 });
             }

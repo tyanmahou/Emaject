@@ -15,6 +15,7 @@ Header Include Only `Emaject.hpp`
 class IPrinter
 {
 public:
+    virtual ~IPrinter() = default;
     virtual void println(std::string_view str) const = 0;
 };
 
@@ -196,7 +197,6 @@ public:
         m_printer0->println("Hello World");
         m_printer1->println("Hello World");
     }
-private:
 private:
     [[INJECT(setPrinter, 0, 1)]]
     void setPrinter(std::shared_ptr<IPrinter> printer0, std::shared_ptr<IPrinter> printer1)

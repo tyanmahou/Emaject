@@ -11,11 +11,13 @@ namespace
     class ICounter
     {
     public:
+        virtual ~ICounter() = default;
         virtual int countUp() = 0;
     };
     class IPrinter
     {
     public:
+        virtual ~IPrinter() = default;
         virtual void println(std::string_view str) const = 0;
     };
     class PrintCounter : public ICounter, public IPrinter

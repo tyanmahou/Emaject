@@ -12,6 +12,8 @@ namespace
 
     class IFoo
     {
+    public:
+        virtual ~IFoo() = default;
     };
     class IFooFoo : public IFoo
     {

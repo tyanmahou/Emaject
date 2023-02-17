@@ -11,6 +11,7 @@ namespace
     class ICounter
     {
     public:
+        virtual ~ICounter() = default;
         virtual int countUp() = 0;
     };
 

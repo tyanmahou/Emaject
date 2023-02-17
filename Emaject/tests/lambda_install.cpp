@@ -13,6 +13,7 @@ namespace
     class IPrinter
     {
     public:
+        virtual ~IPrinter() = default;
         virtual void println(std::string_view str) const = 0;
     };
 

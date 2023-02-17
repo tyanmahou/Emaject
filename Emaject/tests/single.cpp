@@ -22,7 +22,7 @@ namespace
     };
     class PrintCounter : public ICounter, public IPrinter
     {
-        int m_count;
+        int m_count = 0;
     public:
         int countUp() override
         {

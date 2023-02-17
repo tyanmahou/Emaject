@@ -18,7 +18,7 @@ namespace
 
     class Counter : public ICounter
     {
-        int m_count;
+        int m_count = 0;
     public:
         int countUp() override
         {

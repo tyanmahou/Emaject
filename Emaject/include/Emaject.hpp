@@ -51,8 +51,8 @@ namespace emaject
             typename Type::CtorInject;
         };
 
-        template <class Type>
-        concept DefaultInstantiatable = detail::CtorInjectable<Type> || std::default_initializable<Type>;
+        template <class Type, class... Args>
+        concept DefaultInstantiatable = (sizeof...(Args) == 0 && detail::CtorInjectable<Type>) || std::constructible_from<Type, Args...>;
     }
 
     /// <summary>
@@ -67,10 +67,10 @@ namespace emaject
             return Binder<Type, ID>(this);
         }
 
-        template<class Type>
-        [[nodiscard]] std::shared_ptr<Type> instantiate()
+        template<class Type, class...Args>
+        [[nodiscard]] std::shared_ptr<Type> instantiate(Args&&... args)
         {
-            auto ret = this->makeInstance<Type>();
+            auto ret = this->makeInstance<Type>(std::forward<Args>(args)...);
             this->inject(ret.get());
             return ret;
         }
@@ -298,22 +298,23 @@ namespace emaject
                 }
             };
 
-            auto operator()(Container* c) const
+            template<class... Args>
+            auto operator()(Container* c, Args&&... args) const
             {
-                if constexpr (detail::CtorInjectable<Type>) {
+                if constexpr (sizeof...(Args) == 0 && detail::CtorInjectable<Type>) {
                     return ctor<typename Type::CtorInject>{}(c);
-                } else if constexpr (std::default_initializable<Type>) {
-                    return std::make_shared<Type>();
+                } else if constexpr (std::constructible_from<Type, Args...>) {
+                    return std::make_shared<Type>(std::forward<Args>(args)...);
                 } else {
                     return nullptr;
                 }
             }
         };
     private:
-        template<class Type>
-        [[nodiscard]] std::shared_ptr<Type> makeInstance()
+        template<class Type, class...Args>
+        [[nodiscard]] std::shared_ptr<Type> makeInstance(Args&&... args)
         {
-            return Instantiater<Type>{}(this);
+            return Instantiater<Type>{}(this, std::forward<Args>(args)...);
         }
 
         template<class From, class To, int ID>
@@ -374,10 +375,10 @@ namespace emaject
             return *this;
         }
 
-        template<class Type>
-        [[nodiscard]] std::shared_ptr<Type> instantiate() requires detail::DefaultInstantiatable<Type>
+        template<class Type, class... Args>
+        [[nodiscard]] std::shared_ptr<Type> instantiate(Args&&... args) requires detail::DefaultInstantiatable<Type, Args...>
         {
-            return m_container->instantiate<Type>();
+            return m_container->instantiate<Type>(std::forward<Args>(args)...);
         }
         template<class Type, int ID = 0>
         [[nodiscard]] std::shared_ptr<Type> resolve()

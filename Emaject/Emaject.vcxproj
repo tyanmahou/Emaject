@@ -148,6 +148,7 @@
     <ClCompile Include="tests\cached.cpp" />
     <ClCompile Include="tests\ctor_inject.cpp" />
     <ClCompile Include="tests\field_inject.cpp" />
+    <ClCompile Include="tests\from_factory.cpp" />
     <ClCompile Include="tests\from_resolve.cpp" />
     <ClCompile Include="tests\helloworld.cpp" />
     <ClCompile Include="tests\inject_taits.cpp" />

@@ -165,6 +165,10 @@ namespace emaject
             {
                 return toSelf().fromFactory(factory);
             }
+            [[nodiscard]] auto fromFactory(const std::function<std::shared_ptr<Type>()>& factory) const
+            {
+                return toSelf().fromFactory(factory);
+            }
             [[nodiscard]] auto unused() const
             {
                 return toSelf().unused();
